@@ -36,4 +36,13 @@ int main(void) {
     sa2.sa_flags = SA_RESTART;
     sigaction(SEMAPHORE_SIGNAL, &sa2, NULL);
 
-  
+    /* open shared memory and map */
+    int shm_fd = shm_open(dungeon_shm_name, O_RDWR, 0);
+    if (shm_fd < 0) { perror("barbarian shm_open"); return 1; }
+    struct Dungeon *dungeon = mmap(NULL, sizeof(struct Dungeon),
+                                   PROT_READ | PROT_WRITE, MAP_SHARED, shm_fd, 0);
+    if (dungeon == MAP_FAILED) { perror("barbarian mmap"); return 1; }
+
+    /* Open semaphore (do not create) */
+    sem_t *lever1 = sem_open(dungeon_lever_one, 0);
+    if (lever1 == SEM_FAILED) { perror("barbarian sem_open lever1"); /* but continue without semaphores */ }
