@@ -46,3 +46,38 @@ int main(void) {
     /* Open semaphore (do not create) */
     sem_t *lever1 = sem_open(dungeon_lever_one, 0);
     if (lever1 == SEM_FAILED) { perror("barbarian sem_open lever1"); /* but continue without semaphores */ }
+
+    /* main loop */
+    while (dungeon->running) {
+        if (dungeon_signal_received) {
+            dungeon_signal_received = 0;
+            /* copy enemy health to attack */
+            int h = dungeon->enemy.health;
+            dungeon->barbarian.attack = h;
+            /* simulate attack time */
+            sleep(SECONDS_TO_ATTACK);
+            /* leaving the value; dungeon checks for correctness */
+        }
+        if (sem_signal_received) {
+            sem_signal_received = 0;
+            /* Barbarian will try to hold one lever (sem_wait). If sem_open failed, skip safely. */
+            if (lever1 != SEM_FAILED) {
+                sem_wait(lever1); /* hold lever until rogue posts it later */
+                /* After sem_wait, we hold it. We'll release when rogue finishes, but we can't block here forever.
+                   To implement "hold until rogue done" we keep the semaphore held until dungeon->running becomes false
+                   OR until we see dungeon->spoils filled (4 chars) — simple heuristic: wait until spoils full. */
+                while (dungeon->spoils[3] == 0 && dungeon->running) {
+                    usleep(20000);
+                }
+                sem_post(lever1); /* release */
+            }
+        }
+        usleep(20000);
+    }
+
+    /* cleanup */
+    if (lever1 != SEM_FAILED) sem_close(lever1);
+    munmap(dungeon, sizeof(struct Dungeon));
+    close(shm_fd);
+    return 0;
+}
